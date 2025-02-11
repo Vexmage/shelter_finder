@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized(); // Required for async main
+
   runApp(const ShelterFinderApp());
 }
 
@@ -45,6 +47,7 @@ class _MapScreenState extends State<MapScreen> {
 
     serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {
+      print("Location services are disabled.");
       return;
     }
 
@@ -52,18 +55,48 @@ class _MapScreenState extends State<MapScreen> {
     if (permission == LocationPermission.denied) {
       permission = await Geolocator.requestPermission();
       if (permission == LocationPermission.deniedForever) {
+        print("Location permission is permanently denied.");
         return;
       }
     }
 
     Position position = await Geolocator.getCurrentPosition();
+    print("User Location: ${position.latitude}, ${position.longitude}");
+
     setState(() {
       _initialPosition = LatLng(position.latitude, position.longitude);
     });
+
+    // Ensure mapController is initialized before calling animateCamera
+    if (mapController != null) {
+      mapController.animateCamera(
+        CameraUpdate.newCameraPosition(
+          CameraPosition(
+            target: LatLng(position.latitude, position.longitude),
+            zoom: 14.0,
+          ),
+        ),
+      );
+    } else {
+      print("MapController is not yet initialized.");
+    }
   }
 
   void _onMapCreated(GoogleMapController controller) {
     mapController = controller;
+
+    // Once the map is created, update the camera immediately if we have a valid location.
+    if (_initialPosition.latitude != 37.7749) {
+      // ✅ Added missing ')'
+      mapController.animateCamera(
+        CameraUpdate.newCameraPosition(
+          CameraPosition(
+            target: _initialPosition,
+            zoom: 14.0,
+          ),
+        ),
+      );
+    }
   }
 
   @override
