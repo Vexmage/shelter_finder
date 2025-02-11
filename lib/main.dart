@@ -112,6 +112,8 @@ class _MapScreenState extends State<MapScreen> {
       final Map<String, dynamic> data = json.decode(response.body);
       List results = data['results'];
 
+      print("Total shelters received: ${results.length}"); // ✅ Debugging
+
       Set<Marker> newMarkers = {};
 
       for (var place in results) {
@@ -119,10 +121,13 @@ class _MapScreenState extends State<MapScreen> {
         double placeLng = place['geometry']['location']['lng'];
         String name = place['name'];
         String address = place['vicinity'] ?? "No address available";
+        String placeId = place['place_id'];
+
+        print("Adding Marker: $placeId - $name"); // ✅ Debugging
 
         newMarkers.add(
           Marker(
-            markerId: MarkerId(place['place_id']),
+            markerId: MarkerId(placeId),
             position: LatLng(placeLat, placeLng),
             infoWindow: InfoWindow(
               title: name,
@@ -131,6 +136,8 @@ class _MapScreenState extends State<MapScreen> {
           ),
         );
       }
+
+      print("Markers being added: ${newMarkers.length}"); // ✅ Debugging
 
       setState(() {
         _markers = newMarkers;
