@@ -25,7 +25,9 @@ app.get("/shelters", async (req, res) => {
 
         console.log("Using API Key:", apiKey); // Debugging
 
-        const url = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${lat},${lng}&radius=5000&keyword=homeless+shelter|food+pantry&key=${apiKey}`;
+        const radius = 8000; // Increase to 10km (or more)
+        const url = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${lat},${lng}&radius=${radius}&keyword=homeless+shelter|food+pantry&key=${apiKey}`;
+
         const response = await axios.get(url);
         res.json(response.data);
     } catch (error) {
