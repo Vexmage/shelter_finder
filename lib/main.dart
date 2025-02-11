@@ -10,10 +10,10 @@ void main() async {
 
   String apiKey = await loadApiKey(); // ✅ Load API key dynamically
 
-  runApp(ShelterFinderApp(apiKey: apiKey)); // ✅ Remove `const`
+  runApp(ShelterFinderApp(apiKey: apiKey));
 }
 
-// 🔹 Move loadApiKey() outside of any class so it’s accessible in main()
+// 🔹 Load API Key from `secret.json`
 Future<String> loadApiKey() async {
   final jsonString = await rootBundle.loadString('assets/secret.json');
   final jsonMap = json.decode(jsonString);
@@ -28,16 +28,14 @@ class ShelterFinderApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Shelter Finder',
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
-      ),
-      home: MapScreen(apiKey: apiKey), // 🔹 Pass API key to MapScreen
+      theme: ThemeData(primarySwatch: Colors.blue),
+      home: MapScreen(apiKey: apiKey),
     );
   }
 }
 
 class MapScreen extends StatefulWidget {
-  final String apiKey; // ✅ Receive API key
+  final String apiKey;
 
   const MapScreen({super.key, required this.apiKey});
 
@@ -47,8 +45,9 @@ class MapScreen extends StatefulWidget {
 
 class _MapScreenState extends State<MapScreen> {
   late GoogleMapController mapController;
-  LatLng _initialPosition = const LatLng(37.7749, -122.4194); // Default SF
-  Set<Marker> _markers = {}; // Markers for shelters
+  LatLng _currentPosition = const LatLng(37.7749, -122.4194); // Default SF
+  Set<Marker> _markers = {}; // Shelter markers
+  TextEditingController _searchController = TextEditingController();
 
   @override
   void initState() {
@@ -56,17 +55,19 @@ class _MapScreenState extends State<MapScreen> {
     _getUserLocation();
   }
 
-  Future<void> _getUserLocation() async {
-    bool serviceEnabled;
-    LocationPermission permission;
+  void _onMapCreated(GoogleMapController controller) {
+    mapController = controller;
+  }
 
-    serviceEnabled = await Geolocator.isLocationServiceEnabled();
+  // 🔹 Fetch user's current location
+  Future<void> _getUserLocation() async {
+    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {
       print("Location services are disabled.");
       return;
     }
 
-    permission = await Geolocator.checkPermission();
+    LocationPermission permission = await Geolocator.checkPermission();
     if (permission == LocationPermission.denied) {
       permission = await Geolocator.requestPermission();
       if (permission == LocationPermission.deniedForever) {
@@ -79,40 +80,29 @@ class _MapScreenState extends State<MapScreen> {
     print("User Location: ${position.latitude}, ${position.longitude}");
 
     setState(() {
-      _initialPosition = LatLng(position.latitude, position.longitude);
+      _currentPosition = LatLng(position.latitude, position.longitude);
     });
 
-    if (mapController != null) {
-      mapController.animateCamera(
-        CameraUpdate.newCameraPosition(
-          CameraPosition(
-            target: _initialPosition,
-            zoom: 14.0,
-          ),
-        ),
-      );
-    } else {
-      print("MapController is not yet initialized.");
-    }
+    mapController.animateCamera(
+      CameraUpdate.newCameraPosition(
+        CameraPosition(target: _currentPosition, zoom: 14.0),
+      ),
+    );
 
     _fetchNearbyShelters(position.latitude, position.longitude);
   }
 
-  void _onMapCreated(GoogleMapController controller) {
-    mapController = controller;
-  }
-
+  // 🔹 Fetch shelters from backend
   Future<void> _fetchNearbyShelters(double lat, double lng) async {
     final String requestUrl =
         "http://localhost:8080/shelters?lat=$lat&lng=$lng";
-
     final response = await http.get(Uri.parse(requestUrl));
 
     if (response.statusCode == 200) {
       final Map<String, dynamic> data = json.decode(response.body);
       List results = data['results'];
 
-      print("Total shelters received: ${results.length}"); // ✅ Debugging
+      print("Total shelters received: ${results.length}");
 
       Set<Marker> newMarkers = {};
 
@@ -123,27 +113,51 @@ class _MapScreenState extends State<MapScreen> {
         String address = place['vicinity'] ?? "No address available";
         String placeId = place['place_id'];
 
-        print("Adding Marker: $placeId - $name"); // ✅ Debugging
+        print("Adding Marker: $placeId - $name");
 
         newMarkers.add(
           Marker(
             markerId: MarkerId(placeId),
             position: LatLng(placeLat, placeLng),
-            infoWindow: InfoWindow(
-              title: name,
-              snippet: address,
-            ),
+            infoWindow: InfoWindow(title: name, snippet: address),
           ),
         );
       }
 
-      print("Markers being added: ${newMarkers.length}"); // ✅ Debugging
-
       setState(() {
         _markers = newMarkers;
       });
+
+      mapController.animateCamera(
+        CameraUpdate.newCameraPosition(
+          CameraPosition(target: LatLng(lat, lng), zoom: 12.0),
+        ),
+      );
     } else {
       print("Error fetching places: ${response.statusCode}");
+    }
+  }
+
+  // 🔹 Search an address & update map
+  Future<void> _searchLocation() async {
+    String address = _searchController.text.trim();
+    if (address.isEmpty) return;
+
+    final String geocodeUrl = "http://localhost:8080/geocode?address=$address";
+    final response = await http.get(Uri.parse(geocodeUrl));
+
+    if (response.statusCode == 200) {
+      final Map<String, dynamic> location = json.decode(response.body);
+      double lat = location['lat'];
+      double lng = location['lng'];
+
+      setState(() {
+        _currentPosition = LatLng(lat, lng);
+      });
+
+      _fetchNearbyShelters(lat, lng);
+    } else {
+      print("Error fetching location for address: ${response.statusCode}");
     }
   }
 
@@ -151,15 +165,41 @@ class _MapScreenState extends State<MapScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Shelter Finder')),
-      body: GoogleMap(
-        onMapCreated: _onMapCreated,
-        initialCameraPosition: CameraPosition(
-          target: _initialPosition,
-          zoom: 12.0,
-        ),
-        myLocationEnabled: true,
-        myLocationButtonEnabled: true,
-        markers: _markers, // 🔹 Display fetched markers
+      body: Column(
+        children: [
+          // 🔹 Search Bar
+          Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _searchController,
+                    decoration: InputDecoration(
+                      labelText: "Enter a location",
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                ),
+                IconButton(
+                  icon: Icon(Icons.search),
+                  onPressed: _searchLocation,
+                ),
+              ],
+            ),
+          ),
+          // 🔹 Google Map
+          Expanded(
+            child: GoogleMap(
+              onMapCreated: _onMapCreated,
+              initialCameraPosition:
+                  CameraPosition(target: _currentPosition, zoom: 12.0),
+              myLocationEnabled: true,
+              myLocationButtonEnabled: true,
+              markers: _markers,
+            ),
+          ),
+        ],
       ),
     );
   }
