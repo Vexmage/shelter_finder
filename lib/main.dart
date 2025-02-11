@@ -1,15 +1,28 @@
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import 'package:flutter/services.dart' show rootBundle;
 
 void main() async {
-  WidgetsFlutterBinding.ensureInitialized(); // Required for async main
+  WidgetsFlutterBinding.ensureInitialized();
 
-  runApp(const ShelterFinderApp());
+  String apiKey = await loadApiKey(); // ✅ Load API key dynamically
+
+  runApp(ShelterFinderApp(apiKey: apiKey)); // ✅ Remove `const`
+}
+
+// 🔹 Move loadApiKey() outside of any class so it’s accessible in main()
+Future<String> loadApiKey() async {
+  final jsonString = await rootBundle.loadString('assets/secret.json');
+  final jsonMap = json.decode(jsonString);
+  return jsonMap['google_maps_api_key'];
 }
 
 class ShelterFinderApp extends StatelessWidget {
-  const ShelterFinderApp({super.key});
+  final String apiKey;
+  const ShelterFinderApp({super.key, required this.apiKey});
 
   @override
   Widget build(BuildContext context) {
@@ -18,13 +31,15 @@ class ShelterFinderApp extends StatelessWidget {
       theme: ThemeData(
         primarySwatch: Colors.blue,
       ),
-      home: const MapScreen(),
+      home: MapScreen(apiKey: apiKey), // 🔹 Pass API key to MapScreen
     );
   }
 }
 
 class MapScreen extends StatefulWidget {
-  const MapScreen({super.key});
+  final String apiKey; // ✅ Receive API key
+
+  const MapScreen({super.key, required this.apiKey});
 
   @override
   _MapScreenState createState() => _MapScreenState();
@@ -32,8 +47,8 @@ class MapScreen extends StatefulWidget {
 
 class _MapScreenState extends State<MapScreen> {
   late GoogleMapController mapController;
-  LatLng _initialPosition =
-      const LatLng(37.7749, -122.4194); // Default to San Francisco
+  LatLng _initialPosition = const LatLng(37.7749, -122.4194); // Default SF
+  Set<Marker> _markers = {}; // Markers for shelters
 
   @override
   void initState() {
@@ -67,27 +82,7 @@ class _MapScreenState extends State<MapScreen> {
       _initialPosition = LatLng(position.latitude, position.longitude);
     });
 
-    // Ensure mapController is initialized before calling animateCamera
     if (mapController != null) {
-      mapController.animateCamera(
-        CameraUpdate.newCameraPosition(
-          CameraPosition(
-            target: LatLng(position.latitude, position.longitude),
-            zoom: 14.0,
-          ),
-        ),
-      );
-    } else {
-      print("MapController is not yet initialized.");
-    }
-  }
-
-  void _onMapCreated(GoogleMapController controller) {
-    mapController = controller;
-
-    // Once the map is created, update the camera immediately if we have a valid location.
-    if (_initialPosition.latitude != 37.7749) {
-      // ✅ Added missing ')'
       mapController.animateCamera(
         CameraUpdate.newCameraPosition(
           CameraPosition(
@@ -96,6 +91,52 @@ class _MapScreenState extends State<MapScreen> {
           ),
         ),
       );
+    } else {
+      print("MapController is not yet initialized.");
+    }
+
+    _fetchNearbyShelters(position.latitude, position.longitude);
+  }
+
+  void _onMapCreated(GoogleMapController controller) {
+    mapController = controller;
+  }
+
+  Future<void> _fetchNearbyShelters(double lat, double lng) async {
+    final String requestUrl =
+        "http://localhost:8080/shelters?lat=$lat&lng=$lng";
+
+    final response = await http.get(Uri.parse(requestUrl));
+
+    if (response.statusCode == 200) {
+      final Map<String, dynamic> data = json.decode(response.body);
+      List results = data['results'];
+
+      Set<Marker> newMarkers = {};
+
+      for (var place in results) {
+        double placeLat = place['geometry']['location']['lat'];
+        double placeLng = place['geometry']['location']['lng'];
+        String name = place['name'];
+        String address = place['vicinity'] ?? "No address available";
+
+        newMarkers.add(
+          Marker(
+            markerId: MarkerId(place['place_id']),
+            position: LatLng(placeLat, placeLng),
+            infoWindow: InfoWindow(
+              title: name,
+              snippet: address,
+            ),
+          ),
+        );
+      }
+
+      setState(() {
+        _markers = newMarkers;
+      });
+    } else {
+      print("Error fetching places: ${response.statusCode}");
     }
   }
 
@@ -111,6 +152,7 @@ class _MapScreenState extends State<MapScreen> {
         ),
         myLocationEnabled: true,
         myLocationButtonEnabled: true,
+        markers: _markers, // 🔹 Display fetched markers
       ),
     );
   }

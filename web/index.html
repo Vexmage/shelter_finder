@@ -30,9 +30,22 @@
   <link rel="icon" type="image/png" href="favicon.png"/>
 
   <!-- connection to googleapis -->
-  <script async
-      src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCWVz_edFLlmePL5BVXF3vTmG_EhbvIIf8">
-  </script>
+<script>
+  async function loadGoogleMapsApi() {
+    try {
+      const response = await fetch('assets/secret.json');
+      const data = await response.json();
+      const script = document.createElement('script');
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${data.google_maps_api_key}`;
+      script.defer = true;
+      document.head.appendChild(script);
+    } catch (error) {
+      console.error("Failed to load API key:", error);
+    }
+  }
+  loadGoogleMapsApi();
+</script>
+
 
 
 

@@ -1,5 +1,7 @@
 # Miscellaneous
 .env
+assets/secret.json
+
 
 *.class
 *.log
