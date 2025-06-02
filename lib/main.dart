@@ -4,6 +4,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:flutter/services.dart' show rootBundle;
+import 'onboarding_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -28,8 +29,32 @@ class ShelterFinderApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Shelter Finder',
-      theme: ThemeData(primarySwatch: Colors.blue),
-      home: MapScreen(apiKey: apiKey),
+      theme: ThemeData(
+        primaryColor: const Color(0xFF005D57),
+        scaffoldBackgroundColor: const Color(0xFFFAFAF8),
+        fontFamily: 'Roboto', // you can change this if you add fonts
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Color(0xFF005D57),
+          elevation: 2,
+          titleTextStyle: TextStyle(
+            color: Colors.white,
+            fontSize: 20,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        inputDecorationTheme: const InputDecorationTheme(
+          filled: true,
+          fillColor: Color(0xFFF2F2F2),
+          border: OutlineInputBorder(),
+          contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        ),
+        iconTheme: const IconThemeData(color: Color(0xFF005D57)),
+        textTheme: const TextTheme(
+          bodyLarge: TextStyle(fontSize: 16),
+          bodyMedium: TextStyle(fontSize: 14),
+        ),
+      ),
+      home: RootScreen(apiKey: apiKey),
     );
   }
 }
@@ -164,30 +189,45 @@ class _MapScreenState extends State<MapScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Shelter Finder')),
+      appBar: AppBar(
+        title: Row(
+          children: [
+            Icon(Icons.location_on, size: 20),
+            const SizedBox(width: 8),
+            const Text('Shelter Finder'),
+          ],
+        ),
+        centerTitle: false,
+      ),
       body: Column(
         children: [
           // 🔹 Search Bar
           Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _searchController,
-                    decoration: InputDecoration(
-                      labelText: "Enter a location",
-                      border: OutlineInputBorder(),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            child: Material(
+              elevation: 2,
+              borderRadius: BorderRadius.circular(8),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _searchController,
+                      decoration: const InputDecoration(
+                        hintText: "Enter a city or zip code",
+                        border: InputBorder.none,
+                        contentPadding: EdgeInsets.symmetric(horizontal: 16),
+                      ),
                     ),
                   ),
-                ),
-                IconButton(
-                  icon: Icon(Icons.search),
-                  onPressed: _searchLocation,
-                ),
-              ],
+                  IconButton(
+                    icon: const Icon(Icons.search),
+                    onPressed: _searchLocation,
+                  ),
+                ],
+              ),
             ),
           ),
+
           // 🔹 Google Map
           Expanded(
             child: GoogleMap(
@@ -202,5 +242,30 @@ class _MapScreenState extends State<MapScreen> {
         ],
       ),
     );
+  }
+}
+
+class RootScreen extends StatefulWidget {
+  final String apiKey;
+  const RootScreen({super.key, required this.apiKey});
+
+  @override
+  State<RootScreen> createState() => _RootScreenState();
+}
+
+class _RootScreenState extends State<RootScreen> {
+  bool _showMap = false;
+
+  void _continueToMap() {
+    setState(() {
+      _showMap = true;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return _showMap
+        ? MapScreen(apiKey: widget.apiKey)
+        : OnboardingScreen(onContinue: _continueToMap);
   }
 }
