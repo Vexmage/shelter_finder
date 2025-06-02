@@ -192,9 +192,12 @@ class _MapScreenState extends State<MapScreen> {
       appBar: AppBar(
         title: Row(
           children: [
-            Icon(Icons.location_on, size: 20),
+            Image.asset(
+              'assets/shelterfinderlogo.png',
+              height: 28,
+            ),
             const SizedBox(width: 8),
-            const Text('Shelter Finder'),
+            const Text('ShelterFinder'),
           ],
         ),
         centerTitle: false,
@@ -237,6 +240,19 @@ class _MapScreenState extends State<MapScreen> {
               myLocationEnabled: true,
               myLocationButtonEnabled: true,
               markers: _markers,
+            ),
+          ),
+
+          // 🔹 Footer
+          const Padding(
+            padding: EdgeInsets.only(bottom: 8.0),
+            child: Text(
+              "Built by GreatLynxDesigns",
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.grey,
+                fontStyle: FontStyle.italic,
+              ),
             ),
           ),
         ],
