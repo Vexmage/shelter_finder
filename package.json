@@ -1,8 +1,24 @@
 {
   "dependencies": {
-    "axios": "^1.7.9",
+    "axios": "^1.9.0",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "express": "^4.21.2"
-  }
+  },
+  "name": "shelter_finder",
+  "version": "1.0.0",
+  "description": "A mobile-friendly web app built with Flutter that helps users locate nearby homeless shelters, soup kitchens, and food banks using Google Maps and geolocation services.",
+  "main": "server.js",
+  "directories": {
+    "lib": "lib",
+    "test": "test"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node server.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
 }
